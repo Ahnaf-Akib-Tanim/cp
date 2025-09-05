@@ -14,6 +14,11 @@ typedef priority_queue<ll, vector<ll>, greater<ll>> min_heap;
 typedef priority_queue<ll> max_heap;
 typedef pair<ll, ll> pll;
 typedef vector<pll> vpll;
+#define takein1(n, v)           \
+    for (ll i = 1; i <= n; i++) \
+    {                           \
+        cin >> v[i];            \
+    }
 #define takein(n, v)           \
     for (ll i = 0; i < n; i++) \
     {                          \
@@ -750,7 +755,7 @@ ll segmentsum(map<ll, ll> &prefixsum, ll l, ll r)
     }
     return prefixsum[r] - prefixsum[l - 1];
 }
-const ll MOD = 998244353;
+const ll MOD = 1000000007;
 
 ll factorial_mod(ll n)
 {
@@ -912,17 +917,17 @@ vvll allcombinations(vll &vec)
 }
 struct DSU
 {
-    vector<int> e;
-    DSU(int N) { e = vector<int>(N, -1); }
+    vll e;
+    DSU(ll N) { e = vector<ll>(N, -1); }
 
     // get representive component (uses path compression)
-    int get(int x) { return e[x] < 0 ? x : e[x] = get(e[x]); }
+    ll get(ll x) { return e[x] < 0 ? x : e[x] = get(e[x]); }
 
-    bool same_set(int a, int b) { return get(a) == get(b); }
+    bool same_set(ll a, ll b) { return get(a) == get(b); }
 
-    int size(int x) { return -e[get(x)]; }
+    ll size(ll x) { return -e[get(x)]; }
 
-    bool unite(int x, int y)
+    bool unite(ll x, ll y)
     { // union by size
         x = get(x), y = get(y);
         if (x == y)
@@ -965,7 +970,6 @@ void union_set(ll x, ll y, vector<ll> &parent, vector<ll> &rank)
         rank[px]++;
     }
 }
-
 ll countComponents(vector<pair<ll, ll>> &edges)
 {
     ll maxNode = 0;
@@ -1085,10 +1089,131 @@ void bfspath(map<ll, vll> &adj, ll start, ll end, vll &path)
     }
     reverse(path.begin(), path.end());
 }
+vll allsubsetSumsorted(vll &a)
+{
+    // Use an unordered_set to accumulate distinct sums.
+    unordered_set<long long> sums;
+    sums.insert(0); // empty subset
+
+    for (ll x : a)
+    {
+        // collect new sums in a temporary vector to avoid modifying the set
+        // while iterating it.
+        vll newSums;
+        newSums.reserve(sums.size());
+        for (auto s : sums)
+            newSums.push_back(s + x);
+
+        for (auto ns : newSums)
+            sums.insert(ns);
+    }
+
+    // move to vector and sort
+    vll result(sums.begin(), sums.end());
+    sort(result.begin(), result.end());
+    return result;
+}
+ll mod = 1000000007;
+ll npr(ll n, ll r)
+{
+    if (r > n)
+        return 0;
+    ll numerator = 1;
+    for (ll i = 0; i < r; i++)
+    {
+        numerator = (numerator * (n - i)) % mod;
+    }
+    return numerator;
+}
+// Extended GCD: returns gcd(a,b) and finds x,y so that a*x + b*y = gcd(a,b)
+ll extgcd(ll a, ll b, ll &x, ll &y)
+{
+    if (b == 0)
+    {
+        x = 1;
+        y = 0;
+        return a;
+    }
+    ll x1, y1;
+    ll g = extgcd(b, a % b, x1, y1);
+    x = y1;
+    y = x1 - (a / b) * y1;
+    return g;
+}
+
+// Modular inverse using extended GCD (works for any modulus m)
+// Returns inverse in [0, m-1] if exists, otherwise returns -1 to signal no inverse.
+ll modInverse_extgcd(ll a, ll m)
+{
+    a %= m;
+    if (a < 0)
+        a += m;
+    ll x, y;
+    ll g = extgcd(a, m, x, y);
+    if (g != 1)
+        return -1; // inverse doesn't exist
+    ll inv = x % m;
+    if (inv < 0)
+        inv += m;
+    return inv;
+}
+ll norm(ll a, ll m)
+{
+    a %= m;
+    if (a < 0)
+        a += m;
+    return a;
+}
+
+// Solve q * x ≡ p (mod m).
+// Returns vector of solutions in [0, m-1] (empty if none).
+// return p/q mod m
+vector<ll> div_mod_solutions(ll p, ll q, ll m)
+{
+    if (m <= 0)
+        return {}; // invalid modulus
+    // reduce p and q modulo m for convenience
+    p = norm(p, m);
+    q = norm(q, m);
+
+    ll x, y;
+    ll g = std::gcd(q, m);
+    if (p % g != 0)
+        return {}; // no solution
+
+    // reduce equation by g
+    ll qr = q / g;
+    ll pr = p / g;
+    ll mr = m / g;
+
+    // find inverse of qr modulo mr using extended gcd
+    ll inv, tmp;
+    ll gg = extgcd(qr, mr, inv, tmp); // gg should be 1
+    // make sure we have inverse (it should because gcd(qr,mr)==1)
+    if (gg != 1)
+        return {}; // safety
+    inv = norm(inv, mr);
+
+    ll x0 = ((__int128)inv * pr) % mr;
+    if (x0 < 0)
+        x0 += mr;
+
+    // produce the g distinct solutions modulo m:
+    vector<ll> sols;
+    sols.reserve(g);
+    for (ll k = 0; k < g; ++k)
+    {
+        ll sol = x0 + k * mr; // in range [0, m-1] because x0 in [0,mr-1] and k*mr < m
+        sol = norm(sol, m);
+        sols.push_back(sol);
+    }
+    sort(sols.begin(), sols.end());
+    return sols;
+}
 int main()
 {
     ios::sync_with_stdio(false);
-    cin.tie(NULL);
+    cin.tie(nullptr);
     ll t;
     cin >> t;
     while (t--)
