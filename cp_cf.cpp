@@ -1157,6 +1157,24 @@ ll modInverse_extgcd(ll a, ll m)
         inv += m;
     return inv;
 }
+ll chinese_remainder(const vector<ll> &rema, const vector<ll> &mods)
+{
+    ll M = 1;
+    int k = mods.size();
+    for (ll m : mods)
+        M *= m; // product of all moduli
+
+    ll result = 0;
+    for (int i = 0; i < k; i++)
+    {
+        ll Mi = M / mods[i];                     // M_i = M / m_i
+        ll inv = modInverse_extgcd(Mi, mods[i]); // inverse of Mi mod m_i
+        if (inv == -1)
+            return -1; // if inverse doesn't exist
+        result = (result + (__int128)rema[i] * Mi % M * inv % M) % M;
+    }
+    return (result % M + M) % M; // ensure non-negative
+}
 ll norm(ll a, ll m)
 {
     a %= m;
@@ -1209,6 +1227,157 @@ vector<ll> div_mod_solutions(ll p, ll q, ll m)
     }
     sort(sols.begin(), sols.end());
     return sols;
+}
+// cnt the number of numbers in [x,y] that are divisible by any of the divisors in v
+ll count_in_range(ll x, ll y, vector<ll> v)
+{
+    if (x > y)
+        return 0;
+    // Keep only positive divisors <= y
+    vector<ll> divs;
+    divs.reserve(v.size());
+    for (ll d : v)
+        if (d > 0 && d <= y)
+            divs.push_back(d);
+    if (divs.empty())
+        return 0;
+
+    sort(divs.begin(), divs.end());
+    divs.erase(unique(divs.begin(), divs.end()), divs.end());
+
+    // Remove any divisor that is a multiple of a smaller divisor (redundant)
+    vector<ll> filtered;
+    for (size_t i = 0; i < divs.size(); ++i)
+    {
+        bool redundant = false;
+        for (size_t j = 0; j < i; ++j)
+        {
+            if (divs[i] % divs[j] == 0)
+            {
+                redundant = true;
+                break;
+            }
+        }
+        if (!redundant)
+            filtered.push_back(divs[i]);
+    }
+    divs.swap(filtered);
+    if (divs.empty())
+        return 0;
+    if (divs[0] == 1)
+        return (y - x + 1); // everything divisible by 1
+
+    auto count_upto = [&](ll up)
+    {
+        if (up < 1)
+            return 0LL;
+        ll ans = 0;
+        int n = (int)divs.size();
+
+        // DFS with pruning - recursion depth <= n (n typically small after filtering)
+        function<void(int, ll, int)> dfs = [&](int idx, ll cur_lcm, int sign)
+        {
+            for (int i = idx; i < n; ++i)
+            {
+                // compute lcm(cur_lcm, divs[i]) safely and stop if > up
+                ll g = std::gcd(cur_lcm, divs[i]);
+                __int128 t = (__int128)(cur_lcm / g) * (__int128)divs[i];
+                if (t > up)
+                    continue; // pruning: no multiples of this lcm in [1..up]
+                ll nlcm = (ll)t;
+                ll add = up / nlcm;
+                ans += sign * add;
+                dfs(i + 1, nlcm, -sign);
+            }
+        };
+
+        dfs(0, 1LL, +1);
+        return ans;
+    };
+
+    return count_upto(y) - count_upto(x - 1);
+}
+// descrete log
+ll modpow(ll a, ll e, ll mod)
+{
+    ll res = 1 % mod;
+    a %= mod;
+    while (e > 0)
+    {
+        if (e & 1)
+            res = (__int128)res * a % mod;
+        a = (__int128)a * a % mod;
+        e >>= 1;
+    }
+    return res;
+}
+
+// Extended Euclidean Algorithm
+ll egcd(ll a, ll b, ll &x, ll &y)
+{
+    if (b == 0)
+    {
+        x = 1;
+        y = 0;
+        return a;
+    }
+    ll x1, y1;
+    ll g = egcd(b, a % b, x1, y1);
+    x = y1;
+    y = x1 - y1 * (a / b);
+    return g;
+}
+
+// Modular inverse (works even if mod not prime, but gcd(a,mod)=1 required)
+ll modinv(ll a, ll mod)
+{
+    ll x, y;
+    ll g = egcd(a, mod, x, y);
+    if (g != 1)
+        return -1; // inverse doesn't exist
+    x %= mod;
+    if (x < 0)
+        x += mod;
+    return x;
+}
+
+// Baby-step Giant-step algorithm
+ll discrete_log(ll a, ll b, ll m)
+{
+    a %= m, b %= m;
+    if (b == 1 % m)
+        return 0;
+
+    ll n = (ll)sqrt(m) + 1;
+
+    // Baby steps: store a^j
+    unordered_map<ll, ll> baby;
+    ll cur = 1;
+    for (ll j = 0; j < n; j++)
+    {
+        if (!baby.count(cur))
+            baby[cur] = j;
+        cur = (__int128)cur * a % m;
+    }
+
+    // Compute a^(-n)
+    ll an = modpow(a, n, m);
+    ll inv_an = modinv(an, m);
+    if (inv_an == -1)
+        return -1; // no solution if inverse doesn't exist
+
+    // Giant steps
+    cur = b;
+    for (ll i = 0; i <= n; i++)
+    {
+        if (baby.count(cur))
+        {
+            ll ans = i * n + baby[cur];
+            return ans;
+        }
+        cur = (__int128)cur * inv_an % m;
+    }
+    return -1; // no solution
 }
 int main()
 {
